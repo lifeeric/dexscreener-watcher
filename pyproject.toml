@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "dexwatcher"
+version = "0.1.0"
+description = ""
+authors = ["lifeeric"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+httpx = "^0.27.0"
+trio-websocket = "^0.11.1"
+yarl = "^1.9.4"
+websockets = "^12.0"
+redis = "^5.0.3"
+telethon = "^1.34.0"
+rq = "^1.16.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

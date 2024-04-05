@@ -1,0 +1,14 @@
+{
+  "Accept-Encoding": "gzip, deflate, br, zstd",
+  "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+  "Cache-Control": "no-cache",
+  "Connection": "Upgrade",
+  "Host": "io.dexscreener.com",
+  "Origin": "https://dexscreener.com",
+  "Pragma": "no-cache",
+  "Sec-Websocket-Extensions": "permessage-deflate; client_max_window_bits",
+  "Sec-Websocket-Key": "7QfMnmoJbN9JfZimULADtA==",
+  "Sec-Websocket-Version": "13",
+  "Upgrade": "websocket",
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+}
