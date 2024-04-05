@@ -12,7 +12,9 @@ from rq import Retry
 from utils.log import Logger
 from utils.cache import Cache
 from utils.worker import q
+from utils.coin_image_parser import get_image
 from utils.job_message import save_and_send_notification
+
 
 logger = Logger().init("DexScreener")
 
@@ -75,30 +77,31 @@ logger = Logger().init("DexScreener")
 
 class DexScreener:
 
-    def __init__(self, url) -> None:
-        self.url = url
-        self.loop = asyncio.new_event_loop()
+    def __init__(self, urls) -> None:
+        self.urls = urls
         self.cache = Cache()
 
         with open("./headers.json") as f:
             self.headers = json.load(f)
 
-    def watcher(self):
-        return self.loop.run_until_complete(self._sol_coins())
+    async def watcher(self):
+        tasks = [asyncio.create_task(self.get_coins(url)) for url in self.urls]
+        await asyncio.gather(*tasks)
 
-    async def _sol_coins(self):
+    async def get_coins(self, url):
 
         try:
 
-            async with connect(self.url, extra_headers=self.headers) as ws:
+            async with connect(url, extra_headers=self.headers) as ws:
                 while True:
                     coins = json.loads(await ws.recv())
+                    print("[REQ]", type(coins))
                     try:
                         if type(coins) == dict and coins.get("type", {}) == "pairs":
                             await self._create_job_for_coin(coins)
 
                             logger.info("[⏱] listening...")
-                            await asyncio.sleep(10)
+                            await asyncio.sleep(0.5)
                     except Exception as e:
                         logger.info(f"[⚠️] {e}")
                         pass
@@ -112,6 +115,7 @@ class DexScreener:
         for coin in coins.get("pairs", {}):
 
             coin_details = {
+                "chain": coin.get("chainId"),
                 "name": coin.get("baseToken").get("name", ""),
                 "symbol": coin.get("baseToken").get("symbol", ""),
                 "ca": coin.get("pairAddress", ""),
@@ -120,8 +124,11 @@ class DexScreener:
                 "liquidity": coin.get("liquidity", 0),
                 "priceChange": coin.get("priceChange", 0),
                 "pairCreatedAt": coin.get("pairCreatedAt", 0),
-                "img": coin.get("profile", {}).get("imgKey", ""),
             }
+
+            # Download Image
+            img = get_image(coin_details.get("chain"), coin_details.get("ca"))
+            coin_details["img"] = img
 
             if not self.cache.check_coin(coin_details.get("ca")):
                 q.enqueue(
@@ -129,13 +136,24 @@ class DexScreener:
                     args=(coin_details,),
                     retry=Retry(max=10),
                 )
+            await asyncio.sleep(0.5)
 
         with open("./docs/data.json", "w") as f:
             json.dump(coins, f)
 
 
 if __name__ == "__main__":
-    ws_url = "wss://io.dexscreener.com/dex/screener/pairs/h24/1?rankBy[key]=volume&rankBy[order]=desc&filters[liquidity][min]=1000&filters[marketCap][min]=30000&filters[pairAge][min]=1&filters[pairAge][max]=24&filters[buys][m5][min]=3&filters[chainIds][0]=solana"
+    ws_solana = "wss://io.dexscreener.com/dex/screener/pairs/h24/1?rankBy[key]=volume&rankBy[order]=desc&filters[liquidity][min]=1000&filters[marketCap][min]=30000&filters[pairAge][min]=1&filters[pairAge][max]=24&filters[buys][m5][min]=3&filters[chainIds][0]=solana"
+    ws_base = "wss://io.dexscreener.com/dex/screener/pairs/h24/1?rankBy[key]=volume&rankBy[order]=desc&filters[liquidity][min]=1000&filters[marketCap][min]=30000&filters[pairAge][min]=1&filters[pairAge][max]=24&filters[buys][m5][min]=3&filters[chainIds][0]=base"
 
-    dex = DexScreener(ws_url)
-    dex.watcher()
+    dex = DexScreener([ws_base, ws_solana])
+
+    loop = asyncio.new_event_loop()
+
+    try:
+        loop.run_until_complete(dex.watcher())
+    except KeyboardInterrupt:
+        print("ctr + c ")
+    finally:
+        loop.stop()
+        loop.close()
