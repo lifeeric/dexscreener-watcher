@@ -93,12 +93,15 @@ class DexScreener:
             async with connect(self.url, extra_headers=self.headers) as ws:
                 while True:
                     coins = json.loads(await ws.recv())
+                    try:
+                        if type(coins) == dict and coins.get("type", {}) == "pairs":
+                            await self._create_job_for_coin(coins)
 
-                    if coins.get("type", {}) == "pairs":
-                        await self._create_job_for_coin(coins)
-
-                        logger.info("[⏱] listening...")
-                        await asyncio.sleep(10)
+                            logger.info("[⏱] listening...")
+                            await asyncio.sleep(10)
+                    except Exception as e:
+                        logger.info(f"[⚠️] {e}")
+                        pass
 
         except Exception as e:
             logger.error(f"[❌] {e}")
@@ -108,21 +111,22 @@ class DexScreener:
 
         for coin in coins.get("pairs", {}):
 
-            address = coin.get("pairAddress", {})
-            priceUsd = coin.get("priceUsd", {})
-            marketCap = coin.get("marketCap", {})
-            liquidity = coin.get("liquidity", {})
-            priceChange = coin.get("priceChange", {})
+            coin_details = {
+                "name": coin.get("baseToken").get("name", ""),
+                "symbol": coin.get("baseToken").get("symbol", ""),
+                "ca": coin.get("pairAddress", ""),
+                "priceUsd": coin.get("priceUsd", 0),
+                "marketCap": coin.get("marketCap", 0),
+                "liquidity": coin.get("liquidity", 0),
+                "priceChange": coin.get("priceChange", 0),
+                "pairCreatedAt": coin.get("pairCreatedAt", 0),
+                "img": coin.get("profile", {}).get("imgKey", ""),
+            }
 
-            pair = (
-                coin.get("baseToken").get("symbol")
-                + " / "
-                + coin.get("quoteToken").get("symbol")
-            )
-            if not self.cache.check_coin(address):
+            if not self.cache.check_coin(coin_details.get("ca")):
                 q.enqueue(
                     save_and_send_notification,
-                    args=(address, pair, priceUsd, marketCap, liquidity, priceChange),
+                    args=(coin_details,),
                     retry=Retry(max=10),
                 )
 
