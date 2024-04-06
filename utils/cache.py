@@ -16,6 +16,8 @@ class Cache:
             ca: coin pair address
             id: telegram message id
         """
+
+        print(id)
         self.client.set(
             ca,
             json.dumps({"id": id}),
@@ -31,9 +33,9 @@ class Cache:
         Returns: boolean if exists True, else False
         """
 
-        r = json.loads(self.client.get(ca))
+        r = self.client.get(ca)
 
         if r:
-            return True
+            return json.loads(r)
         else:
             False
