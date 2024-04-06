@@ -1,4 +1,5 @@
 import redis
+import json
 
 
 class Cache:
@@ -7,31 +8,30 @@ class Cache:
     def __init__(self) -> None:
         self.client = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
-    def save_coin(self, address: str, notficationSent: bool, date: str):
+    def save_coin(self, ca: str, id: int):
         """
         Store the essential info about coin pair
 
         Args:
-            address: coin pair address
-            notficationSent: if notified tg True, else False
-            date: last update date
+            ca: coin pair address
+            id: telegram message id
         """
-        self.client.hmset(
-            address,
-            {"notficationSent": notficationSent, "updated": date},
+        self.client.set(
+            ca,
+            json.dumps({"id": id}),
         )
 
-    def check_coin(self, address: str):
+    def check_coin(self, ca: str) -> bool:
         """
         Check if a coin has been previously saved.
 
         Args:
-            address: coin pair address
+            ca: coin pair address
 
         Returns: boolean if exists True, else False
         """
 
-        r = self.client.get(address)
+        r = json.loads(self.client.get(ca))
 
         if r:
             return True
