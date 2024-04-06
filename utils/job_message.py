@@ -1,10 +1,11 @@
 import time
 import json
-from datetime import date
 from telethon import TelegramClient, sync
+from typing import Dict
 
 from utils.log import Logger
 from utils.cache import Cache
+from utils.time_converter import time_since
 
 
 logger = Logger.init("TG")
@@ -16,65 +17,65 @@ with open("./config.json", "r") as f:
     api_hash = config.get("api_hash")
 
 
-# class MessageSender:
-#     """Interact with telegram class"""
+def currency_format(value: str) -> str:
+    """
+    Convert number into M, K, B
 
-#     def __init__(self):
-#         with open("./config.json", "r") as f:
-#             self.config = json.load(f)
-#             self.api_id = self.config.get("api_id")
-#             self.api_hash = self.config.get("api_hash")
-#             print(self.config)
+    Args:
+        value: numbers
 
-#         self.bot = TelegramClient("user", self.api_id, self.api_hash)
-
-#     async def connect(self):
-#         """Start the bot with token"""
-#         await self.bot.start()
-
-#     async def send_message(self, text: str = "") -> None:
-#         """
-#         Broadcast Coin to channel
-
-#         Args:
-#             text: coin details
-#         """
-
-#         try:
-#             await self.bot.send_message(
-#                 entity="https://t.me/+WIJV81tlhXllY2Nh", message="text"
-#             )
-#             logger.info(f"Successfully broadcasted")
-
-#         except Exception as e:
-#             logger.error(f"[❌] {e}")
-
-#     async def disconnect(self):
-#         await self.bot.disconnect()
+    Example: 2K, 1.2M
+    """
+    if value >= 1000000000:
+        return f"{value/1000000000:.2f}B"
+    elif value >= 1000000:
+        return f"{value/1000000:.2f}M"
+    elif value >= 1000:
+        return f"{value/1000:.2f}K"
+    else:
+        return f"{value:.0f}"
 
 
-def save_and_send_notification(
-    address, pair, priceUsd, marketCap, liquidity, priceChange
-) -> None:
+def format_msg(coin: Dict) -> str:
+    (
+        name,
+        symbol,
+        ca,
+        priceUsd,
+        marketCap,
+        liquidity,
+        priceChange,
+        pairCreatedAt,
+        img,
+    ) = [coin[k] for k in coin]
+
+    msg = f"""
+{ca}
+
+**`{symbol} — {name}`**
+
+
+🚀 Launch: {time_since(pairCreatedAt)}
+⬆️ Price: **${priceUsd}**
+💰 Market Cap: **${currency_format(marketCap)}**
+📈 Price Change: **{priceChange.get('h1')}%** in last 1 hour
+💧 Liquidity: **${currency_format(liquidity.get('usd'))}**
+
+[DEXScreener](https://dexscreener.com/solana/{ca}) │ [SOLSCAN](https://solscan.io/account/{ca})
+    """
+
+    return msg
+
+
+def save_and_send_notification(coin) -> None:
     """"""
-
+    time.sleep(60)
     logger.info("[📣] Sending...")
 
     with TelegramClient("user", api_id, api_hash) as client:
-        msg = f"""
-**{pair}**
+        msg = format_msg(coin)
+        r = client.send_message(entity="https://t.me/+WIJV81tlhXllY2Nh", message=msg)
 
-🚀 Price: ${priceUsd} (0.1 SOL)
-📊 Current Market Cap: ${marketCap}
-📈 Price Change: {priceChange.get('h24')}% in last 24 hours
-🌐 Liquidity: ${liquidity.get('usd')}
-
-[DEX](https://dexscreener.com/solana/{address})
-
-    """
-        client.send_message(entity="https://t.me/+WIJV81tlhXllY2Nh", message=msg)
-
-    cache = Cache()
-    today = date.today()
-    cache.save_coin(address, notficationSent=True, date=today)
-    logger.info("[✅📣] Sent & Saved")
+        cache = Cache()
+        cache.save_coin(coin.get("ca"), id=r.id)
+        logger.info("[✅📣] Sent & Saved")
