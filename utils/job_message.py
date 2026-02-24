@@ -7,7 +7,6 @@ from utils.log import Logger
 from utils.cache import Cache
 from utils.time_converter import time_since
 
-
 logger = Logger.init("TG")
 
 
@@ -15,6 +14,9 @@ with open("./config.json", "r") as f:
     config = json.load(f)
     api_id = config.get("api_id")
     api_hash = config.get("api_hash")
+    channel = config.get("channel_id")
+    test_channel = config.get("channel_id_test")
+    IS_DEV = config.get("is_dev")
 
 
 def currency_format(value: str) -> str:
@@ -38,6 +40,7 @@ def currency_format(value: str) -> str:
 
 def format_msg(coin: Dict) -> str:
     (
+        chain,
         name,
         symbol,
         ca,
@@ -48,6 +51,12 @@ def format_msg(coin: Dict) -> str:
         pairCreatedAt,
         img,
     ) = [coin[k] for k in coin]
+
+    trx = (
+        f"[SOLSCAN](https://solscan.io/account/{ca})"
+        if chain == "solana"
+        else f"[BaseScan](https://basescan.org/address/{ca})"
+    )
 
     msg = f"""
 {ca}
@@ -61,7 +70,7 @@ def format_msg(coin: Dict) -> str:
 📈 Price Change: **{priceChange.get('h1')}%** in last 1 hour
 💧 Liquidity: **${currency_format(liquidity.get('usd'))}**
 
-[DEXScreener](https://dexscreener.com/solana/{ca}) │ [SOLSCAN](https://solscan.io/account/{ca})
+[DEXScreener](https://dexscreener.com/{chain}/{ca}) │ {trx}
     """
 
     return msg
@@ -69,13 +78,21 @@ def format_msg(coin: Dict) -> str:
 
 def save_and_send_notification(coin) -> None:
     """"""
-    time.sleep(60)
     logger.info("[📣] Sending...")
 
     with TelegramClient("user", api_id, api_hash) as client:
+        id = test_channel if IS_DEV else channel
+
         msg = format_msg(coin)
-        r = client.send_message(entity="https://t.me/+WIJV81tlhXllY2Nh", message=msg)
+
+        if img := coin.get("img"):
+            pass
+            r = client.send_file(id, file=img, caption=msg)
+        else:
+            r = client.send_message(id, message=msg)
+            pass
 
         cache = Cache()
         cache.save_coin(coin.get("ca"), id=r.id)
         logger.info("[✅📣] Sent & Saved")
+    # time.sleep(60)
